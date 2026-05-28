@@ -219,14 +219,18 @@ app.get('/api/expenses', async (req, res) => {
   let rows;
   if (month && year) {
     const r = await pool.query(
-      `SELECT * FROM expenses
+      `SELECT id, amount, category, description, TO_CHAR(date, 'YYYY-MM-DD') as date, created_at
+       FROM expenses
        WHERE TO_CHAR(date, 'MM') = $1 AND TO_CHAR(date, 'YYYY') = $2
        ORDER BY date DESC, id DESC`,
       [month.padStart(2, '0'), year]
     );
     rows = r.rows;
   } else {
-    const r = await pool.query('SELECT * FROM expenses ORDER BY date DESC, id DESC');
+    const r = await pool.query(
+      `SELECT id, amount, category, description, TO_CHAR(date, 'YYYY-MM-DD') as date, created_at
+       FROM expenses ORDER BY date DESC, id DESC`
+    );
     rows = r.rows;
   }
   res.json(rows);
