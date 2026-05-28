@@ -3,3 +3,4 @@ expenses.db
 expenses.db-wal
 expenses.db-shm
 .env
+.codex
