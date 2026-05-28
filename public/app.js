@@ -158,6 +158,7 @@ async function init() {
     $('#amount').focus();
     loadExpenses();
     loadSummary();
+    showToast('Expense added successfully');
   });
 
   loadExpenses();
@@ -272,6 +273,14 @@ async function loadSummary() {
       <td>₹${grandTotal.toFixed(0)}</td>
     </tr>`;
   }
+}
+
+function showToast(msg) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._timeout);
+  el._timeout = setTimeout(() => el.classList.remove('show'), 2500);
 }
 
 init();

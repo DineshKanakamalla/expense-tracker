@@ -149,13 +149,16 @@ app.post('/api/login', loginRateLimit, (req, res) => {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
   loginAttempts.delete(`login:${ip}`);
+  const alreadyLoggedIn = user.session_token && user.session_token.length > 0;
   const token = randomToken();
   db.prepare('UPDATE users SET session_token = ? WHERE id = ?').run(token, user.id);
   req.session.authenticated = true;
   req.session.userId = user.id;
   req.session.username = user.username;
   req.session.sessionToken = token;
-  res.json({ success: true });
+  const response = { success: true };
+  if (alreadyLoggedIn) response.warning = 'User already logged in elsewhere';
+  res.json(response);
 });
 
 app.post('/api/logout', (req, res) => {

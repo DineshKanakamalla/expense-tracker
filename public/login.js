@@ -2,6 +2,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const err = document.getElementById('login-error');
   err.textContent = '';
+  err.style.color = '';
   const btn = e.target.querySelector('button');
   btn.disabled = true;
   btn.textContent = 'Signing in...';
@@ -13,10 +14,15 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
       password: document.getElementById('password').value,
     }),
   });
+  const data = await res.json();
   if (res.ok) {
-    window.location.href = '/';
+    if (data.warning) {
+      const w = document.getElementById('login-error');
+      w.textContent = data.warning;
+      w.style.color = '#ffa726';
+    }
+    setTimeout(() => { window.location.href = '/'; }, 300);
   } else {
-    const data = await res.json();
     err.textContent = data.error || 'Invalid credentials';
     btn.disabled = false;
     btn.textContent = 'Sign in';
