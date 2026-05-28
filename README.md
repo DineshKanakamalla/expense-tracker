@@ -46,5 +46,3 @@ Set these environment variables before starting:
 Deployed on [Render](https://render.com) free tier. Kept awake via UptimeRobot 5‑minute ping.
 
 Live: https://expense-tracker-eq0o.onrender.com
-
-Default credentials: **admin / Din@01#**
