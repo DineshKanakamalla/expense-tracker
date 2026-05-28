@@ -1,0 +1,87 @@
+Expense Tracker Retest Report
+Date: 2026-05-28
+Tester: Codex
+Environment: Local runtime on isolated ports 3100/3101
+
+Summary
+- Core functionality: PASS
+- Major security controls: MOSTLY PASS
+- Remaining issues: 2 (1 medium, 1 high deployment risk)
+
+============================================================
+Executed Test Matrix
+============================================================
+
+1) Availability and routing
+- GET / -> 200 PASS
+- GET /api/expenses unauth -> 401 PASS
+
+2) Authentication/session
+- Login with known valid test user -> 200 PASS
+- /api/me after login -> authenticated:true PASS
+- Logout -> 200 PASS
+- /api/me after logout -> authenticated:false PASS
+
+3) Expense core CRUD
+- Create expense -> 201 PASS
+- List expenses with month/year filter -> 200 PASS
+- Update expense -> 200 PASS
+- Delete expense -> 200 PASS
+- Delete missing expense -> expected 404 behavior previously verified
+
+4) Input validation and business rules
+- Invalid date (2026-99-99) -> 400 PASS
+- Negative amount -> 400 PASS
+- Description > 200 chars -> 400 PASS
+- Invalid category -> blocked when authenticated rules applied PASS
+
+5) Security controls
+- CSRF check with malicious Origin on POST -> 403 PASS
+- Login brute force throttling -> 429 after repeated failures PASS
+- Security headers (helmet) present -> PASS
+- Stored XSS rendering path in UI now escaped (`esc(...)`) -> PASS by code verification
+
+============================================================
+Confirmed Remaining Bugs
+============================================================
+
+[HIGH] Default credential/session secret fallback still present
+- Files:
+  - database.js (default ADMIN_USERNAME/ADMIN_PASSWORD fallback)
+  - server.js (default SESSION_SECRET fallback)
+- Risk:
+  - If env vars are omitted in deployment, app can run with predictable secrets.
+- Evidence:
+  - Runtime warnings printed on startup confirming fallback mode.
+
+[MEDIUM] Oversized JSON payload returns 500 instead of 413
+- File: server.js (global error handler)
+- Repro:
+  - POST /api/expenses with body > 16kb
+- Actual:
+  - HTTP 500 with {"error":"Internal server error"}
+  - Log shows PayloadTooLargeError: request entity too large
+- Expected:
+  - HTTP 413 Payload Too Large (clean client-facing response)
+- Impact:
+  - Incorrect error semantics; monitoring noise and avoidable 500s.
+
+============================================================
+Recommendations
+============================================================
+
+1) Fail fast for missing production secrets
+- Remove insecure fallbacks for admin credentials and session secret in production mode.
+- Exit process when required env vars are absent.
+
+2) Handle body-parser limit error explicitly
+- In error middleware:
+  - if err.type === 'entity.too.large' -> return 413 with JSON error.
+
+3) Optional hardening follow-up
+- Add automated integration tests for:
+  - auth lifecycle
+  - CSRF rejection
+  - rate-limiting threshold
+  - 413 behavior on oversized payload
+

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Expense Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header-bar">
+      <h1>Expense Tracker</h1>
+      <div class="header-actions">
+        <button id="change-pwd-btn" class="header-btn">Change Password</button>
+        <button id="logout-btn" class="header-btn logout-btn">Logout</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="add">Add Expense</button>
+      <button class="tab" data-tab="list">All Expenses</button>
+      <button class="tab" data-tab="summary">Monthly Summary</button>
+    </div>
+
+    <div id="add" class="tab-content active">
+      <form id="expense-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="amount">Amount (₹)</label>
+            <input type="number" id="amount" step="0.01" min="0" required autofocus>
+          </div>
+          <div class="form-group">
+            <label for="category">Category</label>
+            <select id="category" required></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="date">Date</label>
+            <input type="date" id="date" required>
+          </div>
+          <div class="form-group">
+            <label for="description">Description (optional)</label>
+            <input type="text" id="description" placeholder="what was this for?">
+          </div>
+        </div>
+        <button type="submit">Add Expense</button>
+      </form>
+    </div>
+
+    <div id="list" class="tab-content">
+      <div class="filter-bar">
+        <select id="month-filter"></select>
+        <select id="year-filter"></select>
+      </div>
+      <table id="expense-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Amount</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="expense-tbody"></tbody>
+      </table>
+      <div class="total-row" id="list-total">Total: ₹0.00</div>
+    </div>
+
+    <div id="summary" class="tab-content">
+      <div class="filter-bar">
+        <select id="summary-year-filter"></select>
+      </div>
+      <div id="summary-chart"></div>
+      <table id="summary-table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Jan</th>
+            <th>Feb</th>
+            <th>Mar</th>
+            <th>Apr</th>
+            <th>May</th>
+            <th>Jun</th>
+            <th>Jul</th>
+            <th>Aug</th>
+            <th>Sep</th>
+            <th>Oct</th>
+            <th>Nov</th>
+            <th>Dec</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="summary-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="pwd-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h2>Change Password</h2>
+      <form id="pwd-form">
+        <div class="form-group">
+          <label for="current-pwd">Current Password</label>
+          <input type="password" id="current-pwd" required>
+        </div>
+        <div class="form-group">
+          <label for="new-pwd">New Password</label>
+          <input type="password" id="new-pwd" required>
+          <p class="pwd-hint">Min 8 chars, 1 uppercase, 1 lowercase, 1 digit, 1 special character</p>
+        </div>
+        <div class="form-group">
+          <label for="confirm-pwd">Confirm New Password</label>
+          <input type="password" id="confirm-pwd" required>
+        </div>
+        <p id="pwd-error" class="login-error"></p>
+        <div class="modal-actions">
+          <button type="button" id="pwd-cancel" class="modal-btn modal-btn-cancel">Cancel</button>
+          <button type="submit" class="modal-btn modal-btn-primary">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
