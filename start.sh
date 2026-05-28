@@ -2,5 +2,6 @@
 export ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
 export ADMIN_PASSWORD="${ADMIN_PASSWORD:?Must set ADMIN_PASSWORD}"
 export SESSION_SECRET="${SESSION_SECRET:?Must set SESSION_SECRET}"
+export DATABASE_URL="${DATABASE_URL:?Must set DATABASE_URL}"
 export PORT="${PORT:-3000}"
 exec node server.js

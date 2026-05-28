@@ -14,7 +14,7 @@ Personal UPI spending tracker with monthly category-wise summaries.
 ## Tech Stack
 
 - Node.js + Express
-- SQLite (better-sqlite3)
+- PostgreSQL (via Supabase)
 - bcrypt for password hashing
 - express-session with SQLiteSessionStore
 - Helmet security headers + CSP

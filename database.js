@@ -1,34 +1,15 @@
-const Database = require('better-sqlite3');
+const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
-const path = require('path');
 
-const db = new Database(path.join(__dirname, 'expenses.db'));
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    session_token TEXT DEFAULT '',
-    created_at TEXT DEFAULT (datetime('now'))
-  )
-`);
-
-try { db.exec('ALTER TABLE users ADD COLUMN session_token TEXT DEFAULT \'\''); } catch (e) {}
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS expenses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    amount REAL NOT NULL,
-    category TEXT NOT NULL,
-    description TEXT DEFAULT '',
-    date TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now'))
-  )
-`);
+pool.on('error', (err) => {
+  console.error('Unexpected pool error:', err);
+  process.exit(1);
+});
 
 const SALT_ROUNDS = 10;
 
@@ -38,20 +19,6 @@ function hashPassword(password) {
 
 function comparePassword(password, hash) {
   return bcrypt.compareSync(password, hash);
-}
-
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
-  console.error('\x1b[31m%s\x1b[0m', 'FATAL: ADMIN_USERNAME and ADMIN_PASSWORD environment variables must be set.');
-  process.exit(1);
-}
-
-const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(ADMIN_USERNAME);
-if (!existing) {
-  const h = hashPassword(ADMIN_PASSWORD);
-  db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(ADMIN_USERNAME, h);
-  console.log(`Default user "${ADMIN_USERNAME}" created`);
 }
 
 function validatePassword(password) {
@@ -79,4 +46,41 @@ const CATEGORIES = [
   'Miscellaneous',
 ];
 
-module.exports = { db, CATEGORIES, hashPassword, comparePassword, validatePassword };
+async function initDB() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      session_token TEXT DEFAULT '',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS expenses (
+      id SERIAL PRIMARY KEY,
+      amount REAL NOT NULL,
+      category TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      date DATE NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+  if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+    console.error('\x1b[31m%s\x1b[0m', 'FATAL: ADMIN_USERNAME and ADMIN_PASSWORD environment variables must be set.');
+    process.exit(1);
+  }
+
+  const existing = await pool.query('SELECT id FROM users WHERE username = $1', [ADMIN_USERNAME]);
+  if (existing.rows.length === 0) {
+    const h = hashPassword(ADMIN_PASSWORD);
+    await pool.query('INSERT INTO users (username, password_hash) VALUES ($1, $2)', [ADMIN_USERNAME, h]);
+    console.log(`Default user "${ADMIN_USERNAME}" created`);
+  }
+}
+
+module.exports = { pool, initDB, CATEGORIES, hashPassword, comparePassword, validatePassword };
