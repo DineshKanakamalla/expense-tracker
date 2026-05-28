@@ -16,12 +16,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   });
   const data = await res.json();
   if (res.ok) {
-    if (data.warning) {
-      const w = document.getElementById('login-error');
-      w.textContent = data.warning;
-      w.style.color = '#ffa726';
-    }
-    setTimeout(() => { window.location.href = '/'; }, 300);
+    window.location.href = '/';
   } else {
     err.textContent = data.error || 'Invalid credentials';
     btn.disabled = false;

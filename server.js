@@ -151,17 +151,17 @@ app.post('/api/login', loginRateLimit, async (req, res) => {
     recordLoginFailure(ip);
     return res.status(401).json({ error: 'Invalid username or password' });
   }
+  if (user.session_token && user.session_token.length > 0) {
+    return res.status(409).json({ error: 'User already logged in elsewhere' });
+  }
   loginAttempts.delete(`login:${ip}`);
-  const alreadyLoggedIn = user.session_token && user.session_token.length > 0;
   const token = randomToken();
   await pool.query('UPDATE users SET session_token = $1 WHERE id = $2', [token, user.id]);
   req.session.authenticated = true;
   req.session.userId = user.id;
   req.session.username = user.username;
   req.session.sessionToken = token;
-  const response = { success: true };
-  if (alreadyLoggedIn) response.warning = 'User already logged in elsewhere';
-  res.json(response);
+  res.json({ success: true });
 });
 
 app.post('/api/logout', async (req, res) => {
