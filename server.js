@@ -31,9 +31,12 @@ app.use(helmet({
 app.use(express.json({ limit: '16kb' }));
 app.use(express.urlencoded({ extended: false, limit: '16kb' }));
 
-app.set('trust proxy', 1);
+app.set('trust proxy', process.env.RENDER === 'true' ? 1 : 0);
+
+const PgSession = require('connect-pg-simple')(session);
 
 app.use(session({
+  store: new PgSession({ pool, tableName: 'session' }),
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
@@ -80,7 +83,9 @@ function csrfCheck(req, res, next) {
   const origin = req.get('Origin');
   const referer = req.get('Referer');
   const header = origin || referer;
-  if (!header) return next();
+  if (!header) {
+    return res.status(403).json({ error: 'CSRF check failed — missing Origin/Referer' });
+  }
   const host = req.get('X-Forwarded-Host') || req.get('Host');
   try {
     const url = new URL(header);
@@ -99,7 +104,10 @@ async function requireAuth(req, res, next) {
       }
       return req.path === '/' ? res.sendFile(path.join(__dirname, 'public', 'login.html')) : next();
     }
-    const result = await pool.query('SELECT session_token FROM users WHERE id = $1', [req.session.userId]);
+    const result = await pool.query(
+      'SELECT session_token, session_expires_at FROM users WHERE id = $1',
+      [req.session.userId]
+    );
     const user = result.rows[0];
     if (!user || req.session.sessionToken !== user.session_token) {
       req.session.destroy(() => {
@@ -110,6 +118,10 @@ async function requireAuth(req, res, next) {
       });
       return;
     }
+    await pool.query(
+      'UPDATE users SET session_expires_at = $1 WHERE id = $2',
+      [Date.now() + SESSION_TIMEOUT_MS, req.session.userId]
+    );
     next();
   } catch (err) {
     next(err);
@@ -152,11 +164,18 @@ app.post('/api/login', loginRateLimit, async (req, res) => {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
   if (user.session_token && user.session_token.length > 0) {
-    return res.status(409).json({ error: 'User already logged in elsewhere' });
+    if (user.session_expires_at && Date.now() < user.session_expires_at) {
+      return res.status(409).json({ error: 'User already logged in elsewhere' });
+    }
+    await pool.query("UPDATE users SET session_token = '' WHERE id = $1", [user.id]);
   }
   loginAttempts.delete(`login:${ip}`);
   const token = randomToken();
-  await pool.query('UPDATE users SET session_token = $1 WHERE id = $2', [token, user.id]);
+  const expiresAt = Date.now() + SESSION_TIMEOUT_MS;
+  await pool.query(
+    'UPDATE users SET session_token = $1, session_expires_at = $2 WHERE id = $3',
+    [token, expiresAt, user.id]
+  );
   req.session.authenticated = true;
   req.session.userId = user.id;
   req.session.username = user.username;
@@ -166,7 +185,7 @@ app.post('/api/login', loginRateLimit, async (req, res) => {
 
 app.post('/api/logout', async (req, res) => {
   if (req.session && req.session.userId) {
-    await pool.query("UPDATE users SET session_token = '' WHERE id = $1", [req.session.userId]);
+    await pool.query("UPDATE users SET session_token = '', session_expires_at = NULL WHERE id = $1", [req.session.userId]);
   }
   req.session.destroy(() => res.json({ success: true }));
 });
@@ -204,7 +223,7 @@ app.post('/api/change-password', async (req, res) => {
     return res.status(400).json({ error: validationError });
   }
   await pool.query(
-    'UPDATE users SET password_hash = $1, session_token = $2 WHERE id = $3',
+    'UPDATE users SET password_hash = $1, session_token = $2, session_expires_at = NULL WHERE id = $3',
     [hashPassword(newPassword), '', req.session.userId]
   );
   req.session.destroy(() => res.json({ success: true, redirect: '/login.html' }));
@@ -218,12 +237,16 @@ app.get('/api/expenses', async (req, res) => {
   const { month, year } = req.query;
   let rows;
   if (month && year) {
+    const start = `${year}-${month.padStart(2, '0')}-01`;
+    const endDate = new Date(+year, +month, 1);
+    endDate.setMonth(endDate.getMonth() + 1);
+    const end = endDate.toISOString().slice(0, 10);
     const r = await pool.query(
       `SELECT id, amount, category, description, TO_CHAR(date, 'YYYY-MM-DD') as date, created_at
        FROM expenses
-       WHERE TO_CHAR(date, 'MM') = $1 AND TO_CHAR(date, 'YYYY') = $2
+       WHERE date >= $1 AND date < $2
        ORDER BY date DESC, id DESC`,
-      [month.padStart(2, '0'), year]
+      [start, end]
     );
     rows = r.rows;
   } else {
@@ -271,14 +294,16 @@ app.delete('/api/expenses/:id', async (req, res) => {
 app.get('/api/summary', async (req, res) => {
   const { year } = req.query;
   const y = year || new Date().getFullYear().toString();
+  const start = `${y}-01-01`;
+  const end = `${+y + 1}-01-01`;
 
   const result = await pool.query(
     `SELECT category, TO_CHAR(date, 'MM') as month, SUM(amount)::float as total
      FROM expenses
-     WHERE TO_CHAR(date, 'YYYY') = $1
+     WHERE date >= $1 AND date < $2
      GROUP BY category, month
      ORDER BY month, category`,
-    [y]
+    [start, end]
   );
 
   res.json(result.rows);

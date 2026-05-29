@@ -54,6 +54,7 @@ async function initDB() {
       username TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       session_token TEXT DEFAULT '',
+      session_expires_at BIGINT,
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
@@ -68,6 +69,29 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+
+  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS session_expires_at BIGINT');
+  await pool.query(`DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='session_expires_at' AND data_type='timestamp without time zone') THEN
+      ALTER TABLE users ALTER COLUMN session_expires_at TYPE BIGINT USING EXTRACT(EPOCH FROM session_expires_at)::bigint * 1000;
+    END IF;
+  END $$;`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "session" (
+      "sid" varchar NOT NULL COLLATE "default",
+      "sess" json NOT NULL,
+      "expire" timestamp(6) NOT NULL
+    ) WITH (OIDS=FALSE)
+  `);
+  await pool.query(`DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'session_pkey') THEN
+      ALTER TABLE "session" ADD CONSTRAINT session_pkey PRIMARY KEY ("sid");
+    END IF;
+  END $$;`);
+  await pool.query('CREATE INDEX IF NOT EXISTS session_expire_idx ON "session" ("expire")');
+
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses (date)');
 
   const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
   const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
