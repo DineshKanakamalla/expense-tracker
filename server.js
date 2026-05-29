@@ -118,6 +118,16 @@ async function requireAuth(req, res, next) {
       });
       return;
     }
+    if (user.session_expires_at && Date.now() > user.session_expires_at) {
+      await pool.query("UPDATE users SET session_token = '' WHERE id = $1", [req.session.userId]);
+      req.session.destroy(() => {
+        if (req.path.startsWith('/api/')) {
+          return res.status(401).json({ error: 'Session expired' });
+        }
+        res.sendFile(path.join(__dirname, 'public', 'login.html'));
+      });
+      return;
+    }
     await pool.query(
       'UPDATE users SET session_expires_at = $1 WHERE id = $2',
       [Date.now() + SESSION_TIMEOUT_MS, req.session.userId]
