@@ -53,6 +53,7 @@ async function initDB() {
       id SERIAL PRIMARY KEY,
       username TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'user',
       session_token TEXT DEFAULT '',
       session_expires_at BIGINT,
       created_at TIMESTAMP DEFAULT NOW()
@@ -66,6 +67,7 @@ async function initDB() {
       category TEXT NOT NULL,
       description TEXT DEFAULT '',
       date DATE NOT NULL,
+      user_id INTEGER REFERENCES users(id),
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
@@ -76,6 +78,8 @@ async function initDB() {
       ALTER TABLE users ALTER COLUMN session_expires_at TYPE BIGINT USING EXTRACT(EPOCH FROM session_expires_at)::bigint * 1000;
     END IF;
   END $$;`);
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'");
+  await pool.query('ALTER TABLE expenses ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS "session" (
@@ -92,6 +96,7 @@ async function initDB() {
   await pool.query('CREATE INDEX IF NOT EXISTS session_expire_idx ON "session" ("expire")');
 
   await pool.query('CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses (date)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON expenses (user_id)');
 
   const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
   const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
@@ -103,8 +108,10 @@ async function initDB() {
   const existing = await pool.query('SELECT id FROM users WHERE username = $1', [ADMIN_USERNAME]);
   if (existing.rows.length === 0) {
     const h = hashPassword(ADMIN_PASSWORD);
-    await pool.query('INSERT INTO users (username, password_hash) VALUES ($1, $2)', [ADMIN_USERNAME, h]);
-    console.log(`Default user "${ADMIN_USERNAME}" created`);
+    await pool.query('INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)', [ADMIN_USERNAME, h, 'admin']);
+    console.log(`Default admin user "${ADMIN_USERNAME}" created`);
+  } else {
+    await pool.query('UPDATE users SET role = $1 WHERE username = $2', ['admin', ADMIN_USERNAME]);
   }
 }
 

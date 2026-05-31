@@ -138,6 +138,13 @@ async function requireAuth(req, res, next) {
   }
 }
 
+function requireAdmin(req, res, next) {
+  if (req.session.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
 const validateExpense = (body) => {
   const { amount, category, description, date } = body;
   if (!amount || typeof amount !== 'number' || amount <= 0)
@@ -189,6 +196,7 @@ app.post('/api/login', loginRateLimit, async (req, res) => {
   req.session.authenticated = true;
   req.session.userId = user.id;
   req.session.username = user.username;
+  req.session.role = user.role;
   req.session.sessionToken = token;
   res.json({ success: true });
 });
@@ -202,7 +210,7 @@ app.post('/api/logout', async (req, res) => {
 
 app.get('/api/me', (req, res) => {
   if (req.session && req.session.authenticated) {
-    return res.json({ authenticated: true, username: req.session.username });
+    return res.json({ authenticated: true, username: req.session.username, role: req.session.role });
   }
   res.json({ authenticated: false });
 });
@@ -213,6 +221,37 @@ app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.post('/api/users', requireAdmin, async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Username and password required' });
+  }
+  if (username.length < 3 || username.length > 50) {
+    return res.status(400).json({ error: 'Username must be 3-50 characters' });
+  }
+  const validationError = validatePassword(password);
+  if (validationError) {
+    return res.status(400).json({ error: validationError });
+  }
+  const existing = await pool.query('SELECT id FROM users WHERE username = $1', [username]);
+  if (existing.rows.length > 0) {
+    return res.status(409).json({ error: 'Username already exists' });
+  }
+  const h = hashPassword(password);
+  await pool.query(
+    'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)',
+    [username, h, 'user']
+  );
+  res.status(201).json({ success: true });
+});
+
+app.get('/api/users', requireAdmin, async (req, res) => {
+  const result = await pool.query(
+    "SELECT id, username, role, TO_CHAR(created_at, 'YYYY-MM-DD') as created_at FROM users WHERE role = 'user' ORDER BY created_at DESC"
+  );
+  res.json(result.rows);
 });
 
 app.post('/api/change-password', async (req, res) => {
@@ -254,15 +293,18 @@ app.get('/api/expenses', async (req, res) => {
     const r = await pool.query(
       `SELECT id, amount, category, description, TO_CHAR(date, 'YYYY-MM-DD') as date, created_at
        FROM expenses
-       WHERE date >= $1 AND date < $2
+       WHERE date >= $1 AND date < $2 AND user_id = $3
        ORDER BY date DESC, id DESC`,
-      [start, end]
+      [start, end, req.session.userId]
     );
     rows = r.rows;
   } else {
     const r = await pool.query(
       `SELECT id, amount, category, description, TO_CHAR(date, 'YYYY-MM-DD') as date, created_at
-       FROM expenses ORDER BY date DESC, id DESC`
+       FROM expenses
+       WHERE user_id = $1
+       ORDER BY date DESC, id DESC`,
+      [req.session.userId]
     );
     rows = r.rows;
   }
@@ -275,8 +317,8 @@ app.post('/api/expenses', async (req, res) => {
 
   const { amount, category, description, date } = req.body;
   const result = await pool.query(
-    'INSERT INTO expenses (amount, category, description, date) VALUES ($1, $2, $3, $4) RETURNING id',
-    [amount, category, (description || '').slice(0, 200), date]
+    'INSERT INTO expenses (amount, category, description, date, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+    [amount, category, (description || '').slice(0, 200), date, req.session.userId]
   );
   res.status(201).json({ id: result.rows[0].id });
 });
@@ -288,15 +330,15 @@ app.put('/api/expenses/:id', async (req, res) => {
   const { amount, category, description, date } = req.body;
   const result = await pool.query(
     `UPDATE expenses SET amount = $1, category = $2, description = $3, date = $4
-     WHERE id = $5`,
-    [amount, category, (description || '').slice(0, 200), date, req.params.id]
+     WHERE id = $5 AND user_id = $6`,
+    [amount, category, (description || '').slice(0, 200), date, req.params.id, req.session.userId]
   );
   if (result.rowCount === 0) return res.status(404).json({ error: 'Expense not found' });
   res.json({ success: true });
 });
 
 app.delete('/api/expenses/:id', async (req, res) => {
-  const result = await pool.query('DELETE FROM expenses WHERE id = $1', [req.params.id]);
+  const result = await pool.query('DELETE FROM expenses WHERE id = $1 AND user_id = $2', [req.params.id, req.session.userId]);
   if (result.rowCount === 0) return res.status(404).json({ error: 'Expense not found' });
   res.json({ success: true });
 });
@@ -310,10 +352,10 @@ app.get('/api/summary', async (req, res) => {
   const result = await pool.query(
     `SELECT category, TO_CHAR(date, 'MM') as month, SUM(amount)::float as total
      FROM expenses
-     WHERE date >= $1 AND date < $2
+     WHERE date >= $1 AND date < $2 AND user_id = $3
      GROUP BY category, month
      ORDER BY month, category`,
-    [start, end]
+    [start, end, req.session.userId]
   );
 
   res.json(result.rows);

@@ -20,6 +20,7 @@
       <button class="tab active" data-tab="add">Add Expense</button>
       <button class="tab" data-tab="list">All Expenses</button>
       <button class="tab" data-tab="summary">Monthly Summary</button>
+      <button class="tab" data-tab="users" id="admin-users-tab" style="display:none">Manage Users</button>
     </div>
 
     <div id="add" class="tab-content active">
@@ -93,6 +94,31 @@
           </tr>
         </thead>
         <tbody id="summary-tbody"></tbody>
+      </table>
+    </div>
+    <div id="users" class="tab-content">
+      <h3>Create User</h3>
+      <form id="create-user-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="new-username">Username</label>
+            <input type="text" id="new-username" required>
+          </div>
+          <div class="form-group">
+            <label for="new-user-password">Password</label>
+            <input type="password" id="new-user-password" required>
+          </div>
+        </div>
+        <p id="create-user-error" class="login-error"></p>
+        <button type="submit">Create User</button>
+      </form>
+      <hr style="margin:24px 0;border:none;border-top:1px solid #e0e0e0">
+      <h3>Users</h3>
+      <table id="users-table">
+        <thead>
+          <tr><th>Username</th><th>Created</th></tr>
+        </thead>
+        <tbody id="users-tbody"></tbody>
       </table>
     </div>
   </div>

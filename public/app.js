@@ -41,7 +41,6 @@ function currentYear() { return String(new Date().getFullYear()); }
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-// --- Populate selects ---
 function populateSelect(sel, items, val) {
   sel.innerHTML = items.map(i =>
     `<option value="${i}"${i === val ? ' selected' : ''}>${i}</option>`
@@ -63,7 +62,6 @@ function populateYearSelect(sel, val) {
   ).join('');
 }
 
-// --- Tabs ---
 $$('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     $$('.tab').forEach(t => t.classList.remove('active'));
@@ -73,11 +71,16 @@ $$('.tab').forEach(tab => {
 
     if (tab.dataset.tab === 'list') loadExpenses();
     if (tab.dataset.tab === 'summary') loadSummary();
+    if (tab.dataset.tab === 'users') loadUsers();
   });
 });
 
-// --- Add expense ---
 async function init() {
+  const me = await api('/me');
+  if (me.role === 'admin') {
+    $('#admin-users-tab').style.display = '';
+  }
+
   categories = await api('/categories');
   populateSelect($('#category'), categories, categories[0]);
 
@@ -161,10 +164,34 @@ async function init() {
     showToast('Expense added successfully');
   });
 
+  $('#create-user-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = $('#create-user-error');
+    err.textContent = '';
+    const username = $('#new-username').value.trim();
+    const password = $('#new-user-password').value;
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+    try {
+      await api('/users', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      });
+      $('#new-username').value = '';
+      $('#new-user-password').value = '';
+      showToast(`User "${username}" created`);
+      loadUsers();
+    } catch (ex) {
+      err.textContent = ex.message;
+    }
+    btn.disabled = false;
+    btn.textContent = 'Create User';
+  });
+
   loadExpenses();
 }
 
-// --- Load expenses ---
 async function loadExpenses() {
   const month = $('#month-filter').value;
   const year = $('#year-filter').value;
@@ -201,7 +228,6 @@ async function loadExpenses() {
   });
 }
 
-// --- Load summary ---
 async function loadSummary() {
   const year = $('#summary-year-filter').value;
   const data = await api(`/summary?year=${year}`);
@@ -214,7 +240,6 @@ async function loadSummary() {
     grandTotal += row.total;
   }
 
-  // Bar chart (top 5 categories by total)
   const catTotals = Object.entries(grouped).map(([cat, months]) => {
     const total = Object.values(months).reduce((a, b) => a + b, 0);
     return { cat, total };
@@ -239,7 +264,6 @@ async function loadSummary() {
       `).join('')
     }</div>`;
 
-  // Month-wise summary table (all categories, zero-spend shows —)
   const tbody = $('#summary-tbody');
   tbody.innerHTML = categories.map(cat => {
     const months = grouped[cat] || {};
@@ -257,7 +281,6 @@ async function loadSummary() {
     </tr>`;
   }).join('');
 
-  // Grand total row
   if (tbody.innerHTML) {
     tbody.innerHTML += `<tr style="font-weight:700;border-top:2px solid #333">
       <td>Total</td>
@@ -272,6 +295,18 @@ async function loadSummary() {
       }).join('')}
       <td>₹${grandTotal.toFixed(0)}</td>
     </tr>`;
+  }
+}
+
+async function loadUsers() {
+  const users = await api('/users');
+  const tbody = $('#users-tbody');
+  if (users.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;padding:16px;color:#999">No users yet</td></tr>';
+  } else {
+    tbody.innerHTML = users.map(u =>
+      `<tr><td>${esc(u.username)}</td><td>${formatDate(u.created_at)}</td></tr>`
+    ).join('');
   }
 }
 
