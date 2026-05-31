@@ -1,0 +1,278 @@
+Expense Tracker - Full QA & Security Test Report
+Date: 2026-05-31
+Tester: Professional QA (Codex)
+Target Environment: Production URL
+Application URL: https://expense-tracker-eq0o.onrender.com/
+Test Mode: Black-box + API security validation
+
+====================================================================
+Report Format
+====================================================================
+Columns:
+- Category
+- Test Case
+- Procedure
+- Status
+- Comments
+
+Status Legend:
+- PASS: Expected behavior observed
+- FAIL: Defect observed
+- BLOCKED: Cannot execute due missing access/prerequisite
+
+====================================================================
+Test Cases
+====================================================================
+
+1)
+Category: Availability
+Test Case: Homepage availability
+Procedure: Send GET request to / and verify HTTP status.
+Status: PASS
+Comments: Returned HTTP 200.
+
+2)
+Category: Availability
+Test Case: Login page availability
+Procedure: Send GET request to /login.html and verify HTTP status.
+Status: PASS
+Comments: Returned HTTP 200.
+
+3)
+Category: Static Asset Integrity
+Test Case: Main app JS served
+Procedure: Send GET request to /app.js and verify HTTP status.
+Status: PASS
+Comments: Returned HTTP 200.
+
+4)
+Category: Static Asset Integrity
+Test Case: Login JS served
+Procedure: Send GET request to /login.js and verify HTTP status.
+Status: PASS
+Comments: Returned HTTP 200.
+
+5)
+Category: Static Asset Integrity
+Test Case: CSS served
+Procedure: Send GET request to /style.css and verify HTTP status.
+Status: PASS
+Comments: Returned HTTP 200.
+
+6)
+Category: Security Headers
+Test Case: Content Security Policy present
+Procedure: Inspect response headers for content-security-policy.
+Status: PASS
+Comments: CSP present.
+
+7)
+Category: Security Headers
+Test Case: HSTS present
+Procedure: Inspect response headers for strict-transport-security.
+Status: PASS
+Comments: HSTS header present with includeSubDomains.
+
+8)
+Category: Security Headers
+Test Case: MIME sniffing protection
+Procedure: Inspect response headers for x-content-type-options.
+Status: PASS
+Comments: nosniff present.
+
+9)
+Category: Security Headers
+Test Case: Clickjacking protection
+Procedure: Inspect response headers for x-frame-options.
+Status: PASS
+Comments: SAMEORIGIN present.
+
+10)
+Category: Security Headers
+Test Case: Referrer policy
+Procedure: Inspect response headers for referrer-policy.
+Status: PASS
+Comments: no-referrer present.
+
+11)
+Category: Authentication
+Test Case: Unauthenticated profile endpoint behavior
+Procedure: Send GET /api/me without session.
+Status: PASS
+Comments: HTTP 200 with {"authenticated":false}.
+
+12)
+Category: Authorization
+Test Case: Protected data endpoint block (expenses)
+Procedure: Send GET /api/expenses without session.
+Status: PASS
+Comments: HTTP 401 Unauthorized.
+
+13)
+Category: Authorization
+Test Case: Protected data endpoint block (summary)
+Procedure: Send GET /api/summary?year=2026 without session.
+Status: PASS
+Comments: HTTP 401 Unauthorized.
+
+14)
+Category: CSRF Protection
+Test Case: Login POST without Origin/Referer
+Procedure: Send POST /api/login with JSON body and no Origin/Referer.
+Status: PASS
+Comments: HTTP 403 with "missing Origin/Referer" message.
+
+15)
+Category: CSRF Protection
+Test Case: Login POST from malicious origin
+Procedure: Send POST /api/login with Origin: https://evil.example.
+Status: PASS
+Comments: HTTP 403 with CSRF check failed.
+
+16)
+Category: CSRF Protection
+Test Case: Login POST from valid same-site origin
+Procedure: Send POST /api/login with Origin set to production URL and invalid credentials.
+Status: PASS
+Comments: CSRF accepted request path; returned expected auth error HTTP 401.
+
+17)
+Category: Input Validation
+Test Case: Empty login payload
+Procedure: Send POST /api/login with {} from valid origin.
+Status: PASS
+Comments: HTTP 400 with "Username and password required".
+
+18)
+Category: Input Validation
+Test Case: Overlong username login payload
+Procedure: Send POST /api/login with very long username (>50 chars) from valid origin.
+Status: PASS
+Comments: HTTP 400 with "Input too long".
+
+19)
+Category: Request Size Limit
+Test Case: Oversized request body handling
+Procedure: Send POST /api/login with JSON body >16KB from valid origin.
+Status: PASS
+Comments: HTTP 413 with "Request body too large".
+
+20)
+Category: Brute-force Protection
+Test Case: Failed login throttling
+Procedure: Send repeated invalid logins from valid origin and monitor status codes.
+Status: PASS
+Comments: Attempts 1-6 returned 401; attempt 7 returned 429 (rate limiting active).
+
+21)
+Category: HTTP Method Hardening
+Test Case: TRACE method behavior on root
+Procedure: Send TRACE request to /.
+Status: PASS
+Comments: HTTP 405 Method Not Allowed.
+
+22)
+Category: Endpoint/Route Hardening
+Test Case: Non-existent route behavior
+Procedure: Send GET to unknown route /this-route-does-not-exist.
+Status: PASS
+Comments: HTTP 404 returned.
+
+23)
+Category: CORS/Preflight Behavior
+Test Case: OPTIONS on /api/login
+Procedure: Send OPTIONS request to /api/login.
+Status: PASS
+Comments: HTTP 403 due CSRF policy; consistent with strict non-browser access posture.
+
+24)
+Category: Core Feature Functional Test - Login Success
+Test Case: Valid login end-to-end
+Procedure: Login with valid production credential and verify session creation.
+Status: BLOCKED
+Comments: No test credential provided for authenticated production testing.
+
+25)
+Category: Core Feature Functional Test - Expense Create
+Test Case: Add expense with valid inputs
+Procedure: Authenticate then POST /api/expenses and verify persistence.
+Status: BLOCKED
+Comments: Requires valid authenticated session.
+
+26)
+Category: Core Feature Functional Test - Expense List/Filter
+Test Case: List and month/year filtering for expenses
+Procedure: Authenticate then GET /api/expenses?month=&year= and verify dataset correctness.
+Status: BLOCKED
+Comments: Requires valid authenticated session.
+
+27)
+Category: Core Feature Functional Test - Expense Update
+Test Case: Update existing expense
+Procedure: Authenticate then PUT /api/expenses/:id and verify response + data change.
+Status: BLOCKED
+Comments: Requires valid authenticated session and test record.
+
+28)
+Category: Core Feature Functional Test - Expense Delete
+Test Case: Delete existing expense
+Procedure: Authenticate then DELETE /api/expenses/:id and verify removal.
+Status: BLOCKED
+Comments: Requires valid authenticated session and test record.
+
+29)
+Category: Core Feature Functional Test - Password Change
+Test Case: Change password policy and flow
+Procedure: Authenticate then POST /api/change-password with valid/invalid variations.
+Status: BLOCKED
+Comments: Requires valid authenticated session and controlled test user.
+
+30)
+Category: Session Management
+Test Case: Logout and session invalidation
+Procedure: Authenticate, call /api/logout, verify protected endpoints return 401.
+Status: BLOCKED
+Comments: Requires valid authenticated session.
+
+31)
+Category: Data Integrity
+Test Case: Summary aggregation correctness
+Procedure: Authenticate, create multi-category data, validate /api/summary totals.
+Status: BLOCKED
+Comments: Requires authenticated test dataset.
+
+32)
+Category: Client-side Security (XSS)
+Test Case: Stored XSS rendering in UI
+Procedure: Insert payload in description via authenticated API; open list view and verify escaping.
+Status: BLOCKED
+Comments: Authenticated access required to create and view test data.
+
+====================================================================
+Executive Summary
+====================================================================
+- Total Test Cases: 32
+- PASS: 23
+- FAIL: 0
+- BLOCKED: 9
+
+Key Conclusion:
+- Public attack-surface and unauthenticated security checks are passing (headers, auth gate, CSRF, size limits, brute-force throttle, method hardening).
+- No externally reproducible defect found in this pass.
+- Full feature completion sign-off is pending authenticated test execution (9 blocked cases).
+
+====================================================================
+Evidence Snapshot
+====================================================================
+- GET / -> 200
+- GET /api/expenses (unauth) -> 401
+- POST /api/login (no Origin) -> 403
+- POST /api/login (evil Origin) -> 403
+- POST /api/login (same-site Origin, invalid creds) -> 401
+- Repeated invalid login -> 429 on attempt 7
+- Oversized payload -> 413
+
+====================================================================
+Next QA Step Required for Final Sign-off
+====================================================================
+Provide temporary production test credentials (or a staging clone credential) to execute the 9 blocked authenticated scenarios and close the report with complete end-to-end sign-off.

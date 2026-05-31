@@ -312,12 +312,34 @@ async function loadUsers() {
   const users = await api('/users');
   const tbody = $('#users-tbody');
   if (users.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;padding:16px;color:#999">No users yet</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:16px;color:#999">No users yet</td></tr>';
   } else {
     tbody.innerHTML = users.map(u =>
-      `<tr><td>${esc(u.username)}</td><td>${formatDate(u.created_at)}</td></tr>`
+      `<tr>
+        <td>${esc(u.username)}</td>
+        <td>${formatDate(u.created_at)}</td>
+        <td><button class="delete-user-btn" data-id="${u.id}" data-name="${esc(u.username)}">Delete</button></td>
+      </tr>`
     ).join('');
   }
+
+  $$('.delete-user-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const name = btn.dataset.name;
+      if (!confirm(`Delete user "${name}" and all their expenses? This cannot be undone.`)) return;
+      btn.disabled = true;
+      btn.textContent = '...';
+      try {
+        await api(`/users/${btn.dataset.id}`, { method: 'DELETE' });
+        showToast(`User "${name}" deleted`);
+        loadUsers();
+      } catch (ex) {
+        showToast(ex.message);
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+      }
+    });
+  });
 }
 
 function showToast(msg) {

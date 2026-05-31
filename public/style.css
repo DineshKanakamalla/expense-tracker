@@ -472,6 +472,24 @@ tr:hover {
   background: #fee2e2;
 }
 
+.delete-user-btn {
+  background: none;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 3px 10px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+.delete-user-btn:hover {
+  background: #fef2f2;
+}
+.delete-user-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .total-row {
   text-align: right;
   font-size: 1.1rem;

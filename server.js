@@ -254,6 +254,20 @@ app.get('/api/users', requireAdmin, async (req, res) => {
   res.json(result.rows);
 });
 
+app.delete('/api/users/:id', requireAdmin, async (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  if (userId === req.session.userId) {
+    return res.status(400).json({ error: 'Cannot delete your own account' });
+  }
+  const user = await pool.query('SELECT id FROM users WHERE id = $1 AND role = $2', [userId, 'user']);
+  if (user.rows.length === 0) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  await pool.query('DELETE FROM expenses WHERE user_id = $1', [userId]);
+  await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+  res.json({ success: true });
+});
+
 app.post('/api/change-password', async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword || typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
