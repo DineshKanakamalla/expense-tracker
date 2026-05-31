@@ -80,7 +80,26 @@ async function initDB() {
   END $$;`);
   await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'");
   await pool.query('ALTER TABLE expenses ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)');
-  await pool.query("UPDATE expenses SET user_id = (SELECT id FROM users WHERE role = 'admin' LIMIT 1) WHERE user_id IS NULL");
+
+  const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+  if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+    console.error('\x1b[31m%s\x1b[0m', 'FATAL: ADMIN_USERNAME and ADMIN_PASSWORD environment variables must be set.');
+    process.exit(1);
+  }
+
+  const existing = await pool.query('SELECT id FROM users WHERE username = $1', [ADMIN_USERNAME]);
+  if (existing.rows.length === 0) {
+    const h = hashPassword(ADMIN_PASSWORD);
+    await pool.query('INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)', [ADMIN_USERNAME, h, 'admin']);
+    console.log(`Default admin user "${ADMIN_USERNAME}" created`);
+  } else {
+    await pool.query('UPDATE users SET role = $1 WHERE username = $2', ['admin', ADMIN_USERNAME]);
+  }
+
+  const adminRow = await pool.query('SELECT id FROM users WHERE username = $1', [ADMIN_USERNAME]);
+  const adminId = adminRow.rows[0].id;
+  await pool.query('UPDATE expenses SET user_id = $1 WHERE user_id IS NULL', [adminId]);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS "session" (
@@ -98,22 +117,6 @@ async function initDB() {
 
   await pool.query('CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses (date)');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON expenses (user_id)');
-
-  const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
-  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-  if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
-    console.error('\x1b[31m%s\x1b[0m', 'FATAL: ADMIN_USERNAME and ADMIN_PASSWORD environment variables must be set.');
-    process.exit(1);
-  }
-
-  const existing = await pool.query('SELECT id FROM users WHERE username = $1', [ADMIN_USERNAME]);
-  if (existing.rows.length === 0) {
-    const h = hashPassword(ADMIN_PASSWORD);
-    await pool.query('INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)', [ADMIN_USERNAME, h, 'admin']);
-    console.log(`Default admin user "${ADMIN_USERNAME}" created`);
-  } else {
-    await pool.query('UPDATE users SET role = $1 WHERE username = $2', ['admin', ADMIN_USERNAME]);
-  }
 }
 
 module.exports = { pool, initDB, CATEGORIES, hashPassword, comparePassword, validatePassword };
