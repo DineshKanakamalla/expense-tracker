@@ -683,9 +683,8 @@ tr:hover {
 
 .toast {
   position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%) translateY(80px);
+  top: 24px;
+  right: 24px;
   background: #16213e;
   color: #e0e0e0;
   padding: 12px 28px;
@@ -693,12 +692,10 @@ tr:hover {
   font-size: 0.95rem;
   box-shadow: 0 4px 20px rgba(0,0,0,0.3);
   opacity: 0;
-  transition: all 0.35s ease;
+  transition: opacity 0.35s ease;
   pointer-events: none;
   z-index: 999;
-  white-space: nowrap;
 }
 .toast.show {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
 }

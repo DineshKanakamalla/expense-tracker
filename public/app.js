@@ -87,6 +87,11 @@ document.querySelectorAll('.pwd-toggle').forEach(btn => {
 
 async function init() {
   const me = await api('/me');
+
+  if (sessionStorage.getItem('loginSuccess')) {
+    sessionStorage.removeItem('loginSuccess');
+    setTimeout(() => showToast('Login successful'), 100);
+  }
   if (me.role === 'admin') {
     $('#admin-users-tab').style.display = '';
   }
