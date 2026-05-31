@@ -80,6 +80,7 @@ async function initDB() {
   END $$;`);
   await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'");
   await pool.query('ALTER TABLE expenses ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)');
+  await pool.query("UPDATE expenses SET user_id = (SELECT id FROM users WHERE role = 'admin' LIMIT 1) WHERE user_id IS NULL");
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS "session" (
