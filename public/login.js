@@ -1,3 +1,13 @@
+document.querySelectorAll('.pwd-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = btn.closest('.pwd-wrapper').querySelector('input');
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    btn.classList.toggle('visible');
+    btn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+  });
+});
+
 document.getElementById('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const err = document.getElementById('login-error');
